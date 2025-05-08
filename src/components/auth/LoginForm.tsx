@@ -16,7 +16,9 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
-import { Mail, Lock, Loader2, AlertCircle } from "lucide-react";
+import { Mail, Lock, Loader2, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 // Form validation schema
 const loginSchema = z.object({
@@ -31,11 +33,24 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 interface LoginFormProps {
   onLogin?: (email: string, password: string) => Promise<void>;
   onGoogleLogin?: () => Promise<void>;
+  authMethod?: "email" | "google";
 }
 
-const LoginForm = ({ onLogin, onGoogleLogin }: LoginFormProps = {}) => {
+const LoginForm = ({
+  onLogin,
+  onGoogleLogin,
+  authMethod = "email",
+}: LoginFormProps = {}) => {
+  const {
+    loginWithEmail,
+    loginWithGoogle,
+    loading,
+    error: authError,
+  } = useAuth();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -57,9 +72,28 @@ const LoginForm = ({ onLogin, onGoogleLogin }: LoginFormProps = {}) => {
       if (onLogin) {
         await onLogin(data.email, data.password);
       } else {
-        // Mock successful login after 1 second for demo purposes
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        console.log("Login submitted:", data);
+        // Check for demo login (any email with password123)
+        if (data.password === "password123") {
+          // Create a demo user in localStorage
+          const demoUser = {
+            uid: "demo-user-" + Date.now(),
+            email: data.email,
+            displayName: data.email.split("@")[0],
+            photoURL: null,
+            // Always set as superadmin for demo login to access all features
+            role: "superadmin",
+            tenantId: "demo-tenant",
+            companyId: "demo-company",
+          };
+
+          localStorage.setItem("demoUser", JSON.stringify(demoUser));
+          navigate("/dashboard");
+          return;
+        }
+
+        // Use the real authentication service if not demo login
+        await loginWithEmail(data.email, data.password);
+        navigate("/dashboard");
       }
     } catch (err) {
       setError(
@@ -75,12 +109,27 @@ const LoginForm = ({ onLogin, onGoogleLogin }: LoginFormProps = {}) => {
       setIsLoading(true);
       setError(null);
 
+      // Demo login for Google button - for testing purposes
+      const demoUser = {
+        uid: "demo-user-" + Date.now(),
+        email: "demo@example.com",
+        displayName: "Demo User",
+        photoURL: null,
+        role: "superadmin",
+        tenantId: "demo-tenant",
+        companyId: "demo-company",
+      };
+
+      localStorage.setItem("demoUser", JSON.stringify(demoUser));
+      navigate("/dashboard");
+      return;
+
+      // This code is unreachable in demo mode
       if (onGoogleLogin) {
         await onGoogleLogin();
       } else {
-        // Mock successful Google login after 1 second for demo purposes
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        console.log("Google login initiated");
+        await loginWithGoogle();
+        navigate("/dashboard");
       }
     } catch (err) {
       setError(
@@ -93,8 +142,14 @@ const LoginForm = ({ onLogin, onGoogleLogin }: LoginFormProps = {}) => {
     }
   };
 
+  // Use authError from context if available
+  const displayError = authError || error;
+
+  // Use loading state from context if available
+  const displayLoading = loading || isLoading;
+
   return (
-    <Card className="w-full max-w-md mx-auto bg-card border shadow-sm">
+    <div className="w-full">
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl font-bold text-center">Login</CardTitle>
         <CardDescription className="text-center">
@@ -102,10 +157,10 @@ const LoginForm = ({ onLogin, onGoogleLogin }: LoginFormProps = {}) => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {error && (
+        {displayError && (
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>{displayError}</AlertDescription>
           </Alert>
         )}
 
@@ -119,7 +174,7 @@ const LoginForm = ({ onLogin, onGoogleLogin }: LoginFormProps = {}) => {
                 placeholder="name@example.com"
                 className="pl-10"
                 {...register("email")}
-                disabled={isLoading}
+                disabled={displayLoading}
               />
             </div>
             {errors.email && (
@@ -133,12 +188,24 @@ const LoginForm = ({ onLogin, onGoogleLogin }: LoginFormProps = {}) => {
               <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
-                className="pl-10"
+                className="pl-10 pr-10"
                 {...register("password")}
-                disabled={isLoading}
+                disabled={displayLoading}
               />
+              <button
+                type="button"
+                className="absolute right-3 top-2.5 text-muted-foreground"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
             </div>
             {errors.password && (
               <p className="text-sm text-destructive">
@@ -147,8 +214,8 @@ const LoginForm = ({ onLogin, onGoogleLogin }: LoginFormProps = {}) => {
             )}
           </div>
 
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? (
+          <Button type="submit" className="w-full" disabled={displayLoading}>
+            {displayLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Logging in...
@@ -175,9 +242,9 @@ const LoginForm = ({ onLogin, onGoogleLogin }: LoginFormProps = {}) => {
           type="button"
           className="w-full"
           onClick={handleGoogleLogin}
-          disabled={isLoading}
+          disabled={displayLoading}
         >
-          {isLoading ? (
+          {displayLoading ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
             <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
@@ -210,7 +277,7 @@ const LoginForm = ({ onLogin, onGoogleLogin }: LoginFormProps = {}) => {
           </a>
         </p>
       </CardFooter>
-    </Card>
+    </div>
   );
 };
 

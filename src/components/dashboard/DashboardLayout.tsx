@@ -22,8 +22,9 @@ import {
   Building,
   BarChart3,
   FileText,
-  Bell,
+  Tag,
 } from "lucide-react";
+import NotificationCenter from "@/components/notifications/NotificationCenter";
 
 interface DashboardLayoutProps {
   children?: React.ReactNode;
@@ -86,6 +87,12 @@ const DashboardLayout = ({
           name: "User Management",
           icon: <Users className="h-5 w-5" />,
           href: "/dashboard/users",
+          roles: ["superadmin"],
+        },
+        {
+          name: "Coupon Management",
+          icon: <Tag className="h-5 w-5" />,
+          href: "/dashboard/coupons",
           roles: ["superadmin"],
         },
         {
@@ -223,9 +230,7 @@ const DashboardLayout = ({
 
           <div className="flex flex-1 items-center justify-end space-x-4">
             {/* Notifications */}
-            <Button variant="ghost" size="icon">
-              <Bell className="h-5 w-5" />
-            </Button>
+            <NotificationCenter />
 
             {/* User dropdown */}
             <DropdownMenu>

@@ -1,0 +1,9 @@
+import CouponManagement from "@/components/coupon/CouponManagement";
+
+export default function CouponManagementStoryboard() {
+  return (
+    <div className="bg-white min-h-screen">
+      <CouponManagement userRole="superadmin" />
+    </div>
+  );
+}
